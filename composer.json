@@ -1,5 +1,5 @@
 {
-    "name": "helsingborg-stad/e2e-tests",
+    "name": "helsingborg-stad/municipio-e2e-tests",
     "description": "",
     "type": "package",
     "minimum-stability": "dev",
