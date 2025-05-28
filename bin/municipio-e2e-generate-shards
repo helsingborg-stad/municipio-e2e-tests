@@ -1,0 +1,4 @@
+#!/bin/bash
+
+php src/generate-shards.php
+php src/generate-actions-matrix.php

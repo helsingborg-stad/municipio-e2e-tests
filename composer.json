@@ -28,5 +28,9 @@
         "generate:shards:dev": "SITEMAP_URLS=http://localhost:8000/sitemap.xml php src/generate-shards.php",
         "generate-actions-matrix": "php src/generate-actions-matrix.php",
         "run:smoketest": "vendor/bin/phpunit --testdox --testdox-summary --no-progress --testsuite=e2e"
-    }
+    },
+    "bin": [
+        "bin/municipio-e2e-generate-shards",
+        "bin/municipio-e2e-run"
+    ]
 }
