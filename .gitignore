@@ -1,0 +1,8 @@
+/vendor/
+/tests/_output/
+server.pid
+nohup.out
+.phpunit.cache
+.vscode
+/output/*
+!/output/.gitkeep
