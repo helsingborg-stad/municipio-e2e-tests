@@ -51,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup
     strategy:
+      fail-fast: false
       matrix:
         shard: ${{ fromJson(needs.setup.outputs.shards) }}
     steps:
