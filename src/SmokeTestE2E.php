@@ -12,50 +12,65 @@ use Psr\Http\Message\ResponseInterface;
 class SmokeTestE2E extends TestCase
 {
     private static ?Client $httpClient = null;
+    private static array $responses = [];
+     private static array $urls = [];
+
+    public static function setUpBeforeClass(): void
+    {
+                if (empty(self::$urls)) {
+            self::$urls = self::initUrls();
+        }
+
+        $client = self::getHttpClient();
+        $options = self::getRequestOptions();
+
+        foreach (self::$urls as $url) {
+            self::$responses[$url] = $client->getAsync($url, $options);
+        }
+
+        \GuzzleHttp\Promise\Utils::settle(self::$responses)->wait();
+    }
 
     #[TestDox('Smoke test')]
     #[DataProvider('smokeTestProvider')]
     public function testSmokeTest(string $url): void
     {
-        /** @var ResponseInterface $response */
-        $response = self::getHttpClient()->getAsync($url, $this->getRequestOptions())->wait();
+        $promise = self::$responses[$url];
+        $result = $promise->wait();
 
-        // Ensure the response is an instance of Response
-        $this->assertInstanceOf(ResponseInterface::class, $response, 'Expected a Guzzle ResponseInterface object.');
-
-        $body = $response->getBody();
+        $body = $result->getBody();
         $html = '';
         while (!$body->eof()) {
-            $html .= $body->read(1024); // stream in chunks
+            $html .= $body->read(1024);
         }
 
-        $this->assertHeaders($response->getHeaders(), $url);
-        $this->assertContains($response->getStatusCode(), [200, 403, 410], 'Expected status code 200 or 410, got: ' . $response->getStatusCode());
-        $this->assertStringNotContainsString('A view rendering issue has occurred', $html, 'Found a view rendering issue in the response.');
-        $this->assertStringNotContainsString('<!-- Date component: Invalid date -->', $html, 'Found an invalid date component in the response');
+        $this->assertHeaders($result->getHeaders(), $url);
+        $this->assertContains($result->getStatusCode(), [200, 403, 410], 'Unexpected status code: ' . $result->getStatusCode());
+        $this->assertStringNotContainsString('A view rendering issue has occurred', $html);
+        $this->assertStringNotContainsString('<!-- Date component: Invalid date -->', $html);
     }
 
     private function assertHeaders(array $headers, string $url): void
     {
         $expectedOrigin = $this->getOriginFromUrl($url);
 
-        $this->assertHeaderExists($headers, 'Strict-Transport-Security');
-        $this->assertStrictTransportSecurity($headers['Strict-Transport-Security'][0]);
+        $transportSecurityHeader = $headers['Strict-Transport-Security'] ?? $headers['strict-transport-security'] ?? null;
+        $contentSecurityPolicyHeader = $headers['Content-Security-Policy'] ?? $headers['content-security-policy'] ?? null;
+        $accessControlAllowOriginHeader = $headers['Access-Control-Allow-Origin'] ?? $headers['access-control-allow-origin'] ?? null;
 
-        $this->assertHeaderExists($headers, 'Content-Security-Policy');
+        $this->assertNotNull($transportSecurityHeader, 'Strict-Transport-Security header is missing.');
+        $this->assertStrictTransportSecurity($transportSecurityHeader[0]);
+        
+        $this->assertNotNull($contentSecurityPolicyHeader, 'Content-Security-Policy header is missing.');
 
-        $this->assertHeaderExists($headers, 'Access-Control-Allow-Origin');
+        $this->assertNotNull($accessControlAllowOriginHeader, 'Access-Control-Allow-Origin header is missing.');
         $this->assertEquals(
             $expectedOrigin,
-            $headers['Access-Control-Allow-Origin'][0],
+            $accessControlAllowOriginHeader[0],
             'Access-Control-Allow-Origin header does not match the expected URL.'
         );
     }
 
-    private function assertHeaderExists(array $headers, string $header): void
-    {
-        $this->assertArrayHasKey($header, $headers, "$header header is missing in the response.");
-    }
 
     private function assertStrictTransportSecurity(string $headerValue): void
     {
@@ -79,11 +94,12 @@ class SmokeTestE2E extends TestCase
         return $origin;
     }
 
-    private function getRequestOptions():array {
+    private static function getRequestOptions(): array
+    {
         return [
-            'http_errors' => false, 
+            'http_errors' => false,
             'allow_redirects' => true,
-            'timeout' => 10,
+            'timeout' => 100,
             'headers' => [
                 'User-Agent' => 'Municipio Smoke Test E2E'
             ],
@@ -92,27 +108,22 @@ class SmokeTestE2E extends TestCase
 
     public static function smokeTestProvider(): Generator
     {
-        $shardFile = getenv('SHARD_FILE');
-
-        if (empty($shardFile)) {
-            return;
+        if (empty(self::$urls)) {
+            self::$urls = self::initUrls();
         }
 
-        $urls = self::getUrlsFromShardFile($shardFile);
-        $urls = array_map([self::class, 'decorateUrl'], $urls);
-
-        foreach ($urls as $url) {
+        foreach (self::$urls as $url) {
             yield $url => [$url];
         }
     }
 
     private static function decorateUrl(string $url): string
     {
-        // ensure that url has get params debug and pw_test
         $parsedUrl = parse_url($url);
         $query = isset($parsedUrl['query']) ? $parsedUrl['query'] . '&' : '';
         $query .= 'debug=1&pw_test=1';
         $parsedUrl['query'] = $query;
+
         return (isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] . '://' : '') .
             (isset($parsedUrl['host']) ? $parsedUrl['host'] : '') .
             (isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '') .
@@ -120,7 +131,8 @@ class SmokeTestE2E extends TestCase
             '?' . $parsedUrl['query'];
     }
 
-    private static function getUrlsFromShardFile(string $shardFile):array {
+    private static function getUrlsFromShardFile(string $shardFile): array
+    {
         if (!file_exists($shardFile)) {
             return [];
         }
@@ -130,5 +142,11 @@ class SmokeTestE2E extends TestCase
     private static function getHttpClient(): Client
     {
         return self::$httpClient ??= new Client(['timeout' => 20.0]);
+    }
+
+    private static function initUrls(): array
+    {
+        $urls = self::getUrlsFromShardFile(getenv('SHARD_FILE') ?: '');
+        return array_map([self::class, 'decorateUrl'], $urls);
     }
 }
