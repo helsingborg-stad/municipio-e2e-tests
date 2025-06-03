@@ -1,0 +1,90 @@
+name: E2E Tests
+
+on:
+  workflow_call:
+    inputs:
+      sitemaps:
+        required: true
+        type: string
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.generate_shards.outputs.shards }}
+    steps:
+
+      - name: Clone municipio-e2e-tests repository
+        run: git clone https://github.com/helsingborg-stad/municipio-e2e-tests.git .
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install
+      
+      - name: Generate E2E shards
+        id: generate_shards
+        run: |
+          SITEMAP_URLS="${{ inputs.sitemaps }}" composer generate:shards
+          shards=$(composer generate-actions-matrix )
+          echo "Generated shards: $shards"
+          echo "shards=$shards" >> "$GITHUB_OUTPUT"
+      
+      - name: Upload shard files
+        uses: actions/upload-artifact@v4
+        with:
+          name: output
+          path: output
+
+  run:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        shard: ${{ fromJson(needs.setup.outputs.shards) }}
+    steps:
+
+      - name: Clone municipio-e2e-tests repository
+        run: git clone https://github.com/helsingborg-stad/municipio-e2e-tests.git .
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install
+
+      - name: Download shard files
+        uses: actions/download-artifact@v4
+        with:
+          name: output
+          path: output
+
+      - name: List downloaded files
+        run: ls -al output
+
+      - name: List files in root
+        run: ls -al
+
+      - name: Run E2E tests
+        run: SHARD_FILE="${{ matrix.shard }}" composer run run:smoketest

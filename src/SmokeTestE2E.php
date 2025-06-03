@@ -5,9 +5,7 @@ namespace Municipio\SmokeTests;
 use Generator;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
-use GuzzleHttp\Promise\Utils;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
@@ -17,8 +15,13 @@ class SmokeTestE2E extends TestCase
 
     #[TestDox('Smoke test')]
     #[DataProvider('smokeTestProvider')]
-    public function testSmokeTest(Response $response): void
+    public function testSmokeTest(string $url): void
     {
+        $response = self::getHttpClient()->getAsync($url, $this->getRequestOptions())->wait();
+
+        // Ensure the response is an instance of Response
+        $this->assertInstanceOf(Response::class, $response, 'Expected a Guzzle Response object.');
+
         $body = $response->getBody();
         $html = '';
         while (!$body->eof()) {
@@ -30,11 +33,21 @@ class SmokeTestE2E extends TestCase
         $this->assertStringNotContainsString('<!-- Date component: Invalid date -->', $html, 'Found an invalid date component in the response');
     }
 
+    private function getRequestOptions():array {
+        return [
+            'http_errors' => false, 
+            'allow_redirects' => true,
+            'timeout' => 10,
+            'headers' => [
+                'User-Agent' => 'Municipio Smoke Test E2E'
+            ],
+        ];
+    }
+
     public static function smokeTestProvider(): Generator
     {
         $shardFile = getenv('SHARD_FILE');
 
-        
         if (empty($shardFile)) {
             return;
         }
@@ -42,19 +55,8 @@ class SmokeTestE2E extends TestCase
         $urls = self::getUrlsFromShardFile($shardFile);
         $urls = array_map([self::class, 'decorateUrl'], $urls);
 
-        $client = self::getHttpClient();
-        $promises = [];
         foreach ($urls as $url) {
-            $promises[$url] = $client->getAsync($url, ['http_errors' => false, 'allow_redirects' => true]);
-        }
-
-        foreach (Utils::settle($promises)->wait() as $url => $result) {
-            if ($result['state'] === 'fulfilled' && $result['value'] instanceof Response) {
-                yield $url => [$result['value']];
-            } else {
-                // Optionally log failed requests or throw
-                fwrite(STDERR, "Failed to fetch $url\n");
-            }
+            yield $url => [$url];
         }
     }
 

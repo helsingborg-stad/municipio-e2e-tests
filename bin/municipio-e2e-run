@@ -1,3 +1,0 @@
-#!/bin/bash
-
-php vendor/bin/phpunit --testdox --testdox-summary --no-progress --testsuite=e2e

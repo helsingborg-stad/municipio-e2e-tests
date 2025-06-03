@@ -10,9 +10,13 @@ use Municipio\SmokeTests\SplitFileByLinesIntoShards\SplitFileByLinesIntoShards;
 use Municipio\SmokeTests\WriteGeneratorOuputToFile\WriteGeneratorOuputToFile;
 
 const SITEMAPS_ENV_VAR = 'SITEMAP_URLS';
-const ALL_URLS_OUTPUT_FILE = __DIR__ . '/../output/urls.txt';
+const OUTPUT_DIR = __DIR__ . '/../output';
+const ALL_URLS_OUTPUT_FILE = OUTPUT_DIR . '/urls.txt';
 
 $sitemapUrls = getenv(SITEMAPS_ENV_VAR);
+
+// Clear folder contents.
+array_map('unlink', glob(OUTPUT_DIR . '/*.*'));
 
 $urlsGenerator = new GetUrlsFromSitemaps( $sitemapUrls, 1, 3 );
 $fileWriter = new WriteGeneratorOuputToFile();
