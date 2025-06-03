@@ -29,20 +29,54 @@ class SmokeTestE2E extends TestCase
             $html .= $body->read(1024); // stream in chunks
         }
 
-        $headers = $response->getHeaders();
-        $parsedUrl = parse_url($url);
-        $allowOriginUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
-        
-        if (isset($parsedUrl['port'])) {
-            $allowOriginUrl .= ':' . $parsedUrl['port'];
-        }
-        
-
-        $this->assertArrayHasKey('Access-Control-Allow-Origin', $headers, 'Access-Control-Allow-Origin header is missing in the response.');
-        $this->assertEquals($allowOriginUrl, $headers['Access-Control-Allow-Origin'][0], 'Access-Control-Allow-Origin header does not match the expected URL.');
+        $this->assertHeaders($response->getHeaders(), $url);
         $this->assertContains($response->getStatusCode(), [200, 403, 410], 'Expected status code 200 or 410, got: ' . $response->getStatusCode());
         $this->assertStringNotContainsString('A view rendering issue has occurred', $html, 'Found a view rendering issue in the response.');
         $this->assertStringNotContainsString('<!-- Date component: Invalid date -->', $html, 'Found an invalid date component in the response');
+    }
+
+    private function assertHeaders(array $headers, string $url): void
+    {
+        $expectedOrigin = $this->getOriginFromUrl($url);
+
+        $this->assertHeaderExists($headers, 'Strict-Transport-Security');
+        $this->assertStrictTransportSecurity($headers['Strict-Transport-Security'][0]);
+
+        $this->assertHeaderExists($headers, 'Content-Security-Policy');
+
+        $this->assertHeaderExists($headers, 'Access-Control-Allow-Origin');
+        $this->assertEquals(
+            $expectedOrigin,
+            $headers['Access-Control-Allow-Origin'][0],
+            'Access-Control-Allow-Origin header does not match the expected URL.'
+        );
+    }
+
+    private function assertHeaderExists(array $headers, string $header): void
+    {
+        $this->assertArrayHasKey($header, $headers, "$header header is missing in the response.");
+    }
+
+    private function assertStrictTransportSecurity(string $headerValue): void
+    {
+        $this->assertStringContainsString('max-age=', $headerValue, 'Strict-Transport-Security header does not contain max-age.');
+
+        if (preg_match('/max-age=(\d+)/', $headerValue, $matches)) {
+            $maxAge = (int)$matches[1];
+            $this->assertGreaterThanOrEqual(31536000, $maxAge, 'Strict-Transport-Security max-age is less than 1 year.');
+        } else {
+            $this->fail('Strict-Transport-Security header does not contain a valid max-age value.');
+        }
+    }
+
+    private function getOriginFromUrl(string $url): string
+    {
+        $parsedUrl = parse_url($url);
+        $origin = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
+        if (isset($parsedUrl['port'])) {
+            $origin .= ':' . $parsedUrl['port'];
+        }
+        return $origin;
     }
 
     private function getRequestOptions():array {

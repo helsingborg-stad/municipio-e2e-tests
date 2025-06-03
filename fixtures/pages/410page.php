@@ -1,4 +1,6 @@
 <?php header('Access-Control-Allow-Origin: http://localhost:8000'); ?>
+<?php header('Strict-Transport-Security: max-age=31536000;'); ?>
+<?php header('Content-Security-Policy: default-src \'self\';'); ?>
 <?php header('HTTP/1.1 410 Gone'); ?>
 
 <!DOCTYPE html>
