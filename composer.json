@@ -22,10 +22,19 @@
         "phpunit/phpunit": "11.5.x-dev"
     },
     "scripts": {
-        "test": "SHARD=1 vendor/bin/phpunit --testdox --testsuite=unit",
+        "test": "vendor/bin/phpunit --testdox --testsuite=unit",
         "generate:shards": "php src/generate-shards.php",
         "generate:shards:dev": "SITEMAP_URLS=http://localhost:8000/sitemap.xml php src/generate-shards.php",
         "generate-actions-matrix": "php src/generate-actions-matrix.php",
+        "run:smoketest:dev": "SHARD_FILE=\"./output/urls-shard-1.txt\" vendor/bin/phpunit --testdox --testdox-summary --no-progress --testsuite=e2e",
+        "test:e2e:dev": [
+            "@generate:shards:dev",
+            "@run:smoketest:dev"
+        ],
+        "test:e2e:dev:debug": [
+            "XDEBUG_MODE=debug composer run generate:shards:dev",
+            "XDEBUG_MODE=debug composer run run:smoketest:dev"
+        ],
         "run:smoketest": "vendor/bin/phpunit --testdox --testdox-summary --no-progress --testsuite=e2e"
     }
 }

@@ -1,3 +1,4 @@
+<?php header('Access-Control-Allow-Origin: http://localhost:8000'); ?>
 <?php header('HTTP/1.1 410 Gone'); ?>
 
 <!DOCTYPE html>

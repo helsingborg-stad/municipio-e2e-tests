@@ -4,10 +4,10 @@ namespace Municipio\SmokeTests;
 
 use Generator;
 use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\ResponseInterface;
 
 class SmokeTestE2E extends TestCase
 {
@@ -17,10 +17,11 @@ class SmokeTestE2E extends TestCase
     #[DataProvider('smokeTestProvider')]
     public function testSmokeTest(string $url): void
     {
+        /** @var ResponseInterface $response */
         $response = self::getHttpClient()->getAsync($url, $this->getRequestOptions())->wait();
 
         // Ensure the response is an instance of Response
-        $this->assertInstanceOf(Response::class, $response, 'Expected a Guzzle Response object.');
+        $this->assertInstanceOf(ResponseInterface::class, $response, 'Expected a Guzzle ResponseInterface object.');
 
         $body = $response->getBody();
         $html = '';
@@ -28,6 +29,17 @@ class SmokeTestE2E extends TestCase
             $html .= $body->read(1024); // stream in chunks
         }
 
+        $headers = $response->getHeaders();
+        $parsedUrl = parse_url($url);
+        $allowOriginUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
+        
+        if (isset($parsedUrl['port'])) {
+            $allowOriginUrl .= ':' . $parsedUrl['port'];
+        }
+        
+
+        $this->assertArrayHasKey('Access-Control-Allow-Origin', $headers, 'Access-Control-Allow-Origin header is missing in the response.');
+        $this->assertEquals($allowOriginUrl, $headers['Access-Control-Allow-Origin'][0], 'Access-Control-Allow-Origin header does not match the expected URL.');
         $this->assertContains($response->getStatusCode(), [200, 403, 410], 'Expected status code 200 or 410, got: ' . $response->getStatusCode());
         $this->assertStringNotContainsString('A view rendering issue has occurred', $html, 'Found a view rendering issue in the response.');
         $this->assertStringNotContainsString('<!-- Date component: Invalid date -->', $html, 'Found an invalid date component in the response');
@@ -83,6 +95,6 @@ class SmokeTestE2E extends TestCase
 
     private static function getHttpClient(): Client
     {
-        return self::$httpClient ??= new Client(['timeout' => 10.0]);
+        return self::$httpClient ??= new Client(['timeout' => 20.0]);
     }
 }
