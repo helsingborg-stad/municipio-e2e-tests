@@ -20,7 +20,7 @@ array_map('unlink', glob(OUTPUT_DIR . '/*.*'));
 
 $urlsGenerator = new GetUrlsFromSitemaps( $sitemapUrls, 1, 3 );
 $fileWriter = new WriteGeneratorOuputToFile();
-$fileSplitter = new SplitFileByLinesIntoShards( ALL_URLS_OUTPUT_FILE );
+$fileSplitter = new SplitFileByLinesIntoShards( ALL_URLS_OUTPUT_FILE, 150 );
 
 $fileWriter->write($urlsGenerator->getUrlsFromSitemaps(), ALL_URLS_OUTPUT_FILE);
 $fileSplitter->split();
