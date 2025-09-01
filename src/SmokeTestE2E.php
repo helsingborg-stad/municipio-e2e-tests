@@ -166,7 +166,6 @@ class SmokeTestE2E extends TestCase
     {
         $parsedUrl = parse_url($url);
         $query = isset($parsedUrl['query']) ? $parsedUrl['query'] . '&' : '';
-        $query .= 'debug=1&pw_test=1';
         $parsedUrl['query'] = $query;
 
         return (isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] . '://' : '') .
