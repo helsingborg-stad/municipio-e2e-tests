@@ -171,8 +171,7 @@ class SmokeTestE2E extends TestCase
         return (isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] . '://' : '') .
             (isset($parsedUrl['host']) ? $parsedUrl['host'] : '') .
             (isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '') .
-            (isset($parsedUrl['path']) ? $parsedUrl['path'] : '') .
-            '?' . $parsedUrl['query'];
+            (isset($parsedUrl['path']) ? $parsedUrl['path'] : '');
     }
 
     private static function getUrlsFromShardFile(string $shardFile): array
