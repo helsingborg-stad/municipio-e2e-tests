@@ -89,6 +89,12 @@ class SmokeTestE2E extends TestCase
             $html .= $body->read(1024);
         }
 
+        // if we were redirected to some other site, skip. We only want to test our own site.
+        if($result->getStatusCode() === 301 && $result->hasHeader('Location') && strpos($result->getHeaderLine('Location'), parse_url($url, PHP_URL_HOST)) === false) {
+            $this->assertTrue(true);
+            return;
+        }
+        
         $this->assertHeaders($result->getHeaders(), $url);
         $this->assertContains($result->getStatusCode(), [200, 403, 410, 404], 'Unexpected status code: ' . $result->getStatusCode());
         $this->assertStringNotContainsString('A view rendering issue has occurred', $html);
@@ -104,7 +110,6 @@ class SmokeTestE2E extends TestCase
         $accessControlAllowOriginHeader = $headers['Access-Control-Allow-Origin'] ?? $headers['access-control-allow-origin'] ?? null;
 
         $this->assertNotNull($transportSecurityHeader, 'Strict-Transport-Security header is missing.');
-        //$this->assertStrictTransportSecurity($transportSecurityHeader[0]);
         
         $this->assertNotNull($contentSecurityPolicyHeader, 'Content-Security-Policy header is missing.');
 
@@ -114,19 +119,6 @@ class SmokeTestE2E extends TestCase
             $accessControlAllowOriginHeader[0],
             'Access-Control-Allow-Origin header does not match the expected URL.'
         );
-    }
-
-
-    private function assertStrictTransportSecurity(string $headerValue): void
-    {
-        $this->assertStringContainsString('max-age=', $headerValue, 'Strict-Transport-Security header does not contain max-age.');
-
-        if (preg_match('/max-age=(\d+)/', $headerValue, $matches)) {
-            $maxAge = (int)$matches[1];
-            $this->assertGreaterThanOrEqual(31536000, $maxAge, 'Strict-Transport-Security max-age is less than 1 year.');
-        } else {
-            $this->fail('Strict-Transport-Security header does not contain a valid max-age value.');
-        }
     }
 
     private function getOriginFromUrl(string $url): string
@@ -143,7 +135,7 @@ class SmokeTestE2E extends TestCase
     {
         return [
             'http_errors' => false,
-            'allow_redirects' => true,
+            'allow_redirects' => false,
             'timeout' => 20,
             'headers' => [
                 'User-Agent' => 'Municipio Smoke Test E2E'
