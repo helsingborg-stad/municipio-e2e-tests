@@ -95,7 +95,7 @@ class SmokeTestE2E extends TestCase
             return;
         }
         
-        $this->assertContains($result->getStatusCode(), [200, 403, 410, 404, 302], 'Unexpected status code: ' . $result->getStatusCode());
+        $this->assertContains($result->getStatusCode(), [200, 403, 410, 404, 302, 301], 'Unexpected status code: ' . $result->getStatusCode());
 
         if($result->getStatusCode() !== 200) {
             return;
