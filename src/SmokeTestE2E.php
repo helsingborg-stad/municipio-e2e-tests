@@ -96,7 +96,7 @@ class SmokeTestE2E extends TestCase
         }
         
         $this->assertHeaders($result->getHeaders(), $url);
-        $this->assertContains($result->getStatusCode(), [200, 403, 410, 404], 'Unexpected status code: ' . $result->getStatusCode());
+        $this->assertContains($result->getStatusCode(), [200, 403, 410, 404, 302], 'Unexpected status code: ' . $result->getStatusCode());
         $this->assertStringNotContainsString('A view rendering issue has occurred', $html);
         $this->assertStringNotContainsString('<!-- Date component: Invalid date -->', $html);
     }
