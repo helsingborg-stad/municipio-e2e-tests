@@ -29,22 +29,18 @@ class SmokeTestE2E extends TestCase
     public function testSmokeTest(string $url): void
     {
         $result = $this->client->get($url);
-
-        $body = $result->getBody();
-        $html = '';
-        while (!$body->eof()) {
-            $html .= $body->read(1024);
-        }
+        $html = (string)$result->getBody();
+        $statusCode = $result->getStatusCode();
 
         // if we were redirected to some other site, skip. We only want to test our own site.
-        if($result->getStatusCode() === 301 && $result->hasHeader('Location') && strpos($result->getHeaderLine('Location'), parse_url($url, PHP_URL_HOST)) === false) {
+        if($statusCode === 301 && $result->hasHeader('Location') && strpos($result->getHeaderLine('Location'), parse_url($url, PHP_URL_HOST)) === false) {
             $this->assertTrue(true);
             return;
         }
         
-        $this->assertContains($result->getStatusCode(), [200, 403, 410, 404, 302, 301], 'Unexpected status code: ' . $result->getStatusCode());
+        $this->assertContains($statusCode, [200, 403, 410, 404, 302, 301], 'Unexpected status code: ' . $statusCode);
 
-        if($result->getStatusCode() !== 200) {
+        if($statusCode !== 200) {
             return;
         }
 
@@ -56,19 +52,14 @@ class SmokeTestE2E extends TestCase
     private function assertHeaders(array $headers, string $url): void
     {
         $expectedOrigin = $this->getOriginFromUrl($url);
-
-        $transportSecurityHeader = $headers['Strict-Transport-Security'] ?? $headers['strict-transport-security'] ?? null;
-        $contentSecurityPolicyHeader = $headers['Content-Security-Policy'] ?? $headers['content-security-policy'] ?? null;
-        $accessControlAllowOriginHeader = $headers['Access-Control-Allow-Origin'] ?? $headers['access-control-allow-origin'] ?? null;
-
-        $this->assertNotNull($transportSecurityHeader, 'Strict-Transport-Security header is missing.');
+        $headers = array_change_key_case($headers, CASE_LOWER);
         
-        $this->assertNotNull($contentSecurityPolicyHeader, 'Content-Security-Policy header is missing.');
-
-        $this->assertNotNull($accessControlAllowOriginHeader, 'Access-Control-Allow-Origin header is missing.');
+        $this->assertArrayHasKey('strict-transport-security', $headers, 'Strict-Transport-Security header is missing.');
+        $this->assertArrayHasKey('content-security-policy', $headers, 'Content-Security-Policy header is missing.');
+        $this->assertArrayHasKey('access-control-allow-origin', $headers, 'Access-Control-Allow-Origin header is missing.');
         $this->assertEquals(
             $expectedOrigin,
-            $accessControlAllowOriginHeader[0],
+            $headers['access-control-allow-origin'][0],
             'Access-Control-Allow-Origin header does not match the expected URL.'
         );
     }
@@ -85,34 +76,8 @@ class SmokeTestE2E extends TestCase
 
     public static function smokeTestProvider(): Generator
     {
-        foreach (self::initUrls() as $url) {
+        foreach (file(getenv('SHARD_FILE') ?: '', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $url) {
             yield $url => [$url];
         }
-    }
-
-    private static function decorateUrl(string $url): string
-    {
-        $parsedUrl = parse_url($url);
-        $query = isset($parsedUrl['query']) ? $parsedUrl['query'] . '&' : '';
-        $parsedUrl['query'] = $query;
-
-        return (isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] . '://' : '') .
-            (isset($parsedUrl['host']) ? $parsedUrl['host'] : '') .
-            (isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '') .
-            (isset($parsedUrl['path']) ? $parsedUrl['path'] : '');
-    }
-
-    private static function getUrlsFromShardFile(string $shardFile): array
-    {
-        if (!file_exists($shardFile)) {
-            return [];
-        }
-        return file($shardFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    }
-
-    private static function initUrls(): array
-    {
-        $urls = self::getUrlsFromShardFile(getenv('SHARD_FILE') ?: '');
-        return array_map([self::class, 'decorateUrl'], $urls);
     }
 }
