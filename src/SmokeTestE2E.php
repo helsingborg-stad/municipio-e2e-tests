@@ -10,78 +10,25 @@ use PHPUnit\Framework\TestCase;
 
 class SmokeTestE2E extends TestCase
 {
-    private static ?Client $httpClient = null;
-    private static array $responses = [];
-    private static array $urls = [];
-    private static array $failedUrls = [];
-    private static int $maxRetries = 2; // Dynamic number of retries, can be set externally
-    private static int $delayMs = 500; // 0.5 second delay between requests
+    private Client $client;
 
-    public static function setUpBeforeClass(): void
+    protected function setUp(): void
     {
-        if (empty(self::$urls)) {
-            self::$urls = self::initUrls();
-        }
-
-        $client = self::getHttpClient();
-        $options = self::getRequestOptions();
-        $failed = [];
-
-        // First pass: try all URLs
-        foreach (self::$urls as $url) {
-            try {
-                $response = $client->get($url, $options);
-                self::$responses[$url] = new class($response) {
-                    private $response;
-                    public function __construct($response) { $this->response = $response; }
-                    public function wait() { return $this->response; }
-                };
-            } catch (\Exception $e) {
-                self::$responses[$url] = new class($e) {
-                    private $exception;
-                    public function __construct($exception) { $this->exception = $exception; }
-                    public function wait() { throw $this->exception; }
-                };
-                $failed[] = $url;
-            }
-            usleep(self::$delayMs * 1000);
-        }
-
-        // Retry logic
-        $retries = 0;
-        while (!empty($failed) && $retries < self::$maxRetries) {
-            $retries++;
-            $retryFailed = [];
-            foreach ($failed as $url) {
-                try {
-                    $response = $client->get($url, $options);
-                    self::$responses[$url] = new class($response) {
-                        private $response;
-                        public function __construct($response) { $this->response = $response; }
-                        public function wait() { return $this->response; }
-                    };
-                } catch (\Exception $e) {
-                    self::$responses[$url] = new class($e) {
-                        private $exception;
-                        public function __construct($exception) { $this->exception = $exception; }
-                        public function wait() { throw $this->exception; }
-                    };
-                    $retryFailed[] = $url;
-                }
-                usleep(self::$delayMs * 1000);
-            }
-            $failed = $retryFailed;
-        }
-
-        self::$failedUrls = $failed;
+        $this->client = new Client([
+            'http_errors' => false,
+            'allow_redirects' => false,
+            'timeout' => 20,
+            'headers' => [
+                'User-Agent' => 'Municipio Smoke Test E2E'
+            ],
+        ]);
     }
 
     #[TestDox('Smoke test')]
     #[DataProvider('smokeTestProvider')]
     public function testSmokeTest(string $url): void
     {
-        $promise = self::$responses[$url];
-        $result = $promise->wait();
+        $result = $this->client->get($url);
 
         $body = $result->getBody();
         $html = '';
@@ -136,25 +83,9 @@ class SmokeTestE2E extends TestCase
         return $origin;
     }
 
-    private static function getRequestOptions(): array
-    {
-        return [
-            'http_errors' => false,
-            'allow_redirects' => false,
-            'timeout' => 20,
-            'headers' => [
-                'User-Agent' => 'Municipio Smoke Test E2E'
-            ],
-        ];
-    }
-
     public static function smokeTestProvider(): Generator
     {
-        if (empty(self::$urls)) {
-            self::$urls = self::initUrls();
-        }
-
-        foreach (self::$urls as $url) {
+        foreach (self::initUrls() as $url) {
             yield $url => [$url];
         }
     }
@@ -177,11 +108,6 @@ class SmokeTestE2E extends TestCase
             return [];
         }
         return file($shardFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    }
-
-    private static function getHttpClient(): Client
-    {
-        return self::$httpClient ??= new Client(['timeout' => 20.0]);
     }
 
     private static function initUrls(): array
